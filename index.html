@@ -124,7 +124,7 @@
       position: absolute; right: 20px; top: 50%;
       transform: translateY(-50%);
       font-size: 2rem;
-      opacity: 0.15;
+      opacity: 0.6;
     }
 
     /* Filters */
@@ -140,9 +140,9 @@
       flex-wrap: wrap;
     }
 
-    .filters label {
+    .filter-group label {
       font-size: 0.78rem;
-      color: #64748b;
+      color: #ffffff;
       text-transform: uppercase;
       letter-spacing: 0.06em;
       margin-right: 4px;
@@ -402,11 +402,11 @@
 </main>
 
 <script>
+  Chart.defaults.color = '#e2e8f0';
+
   let allData = [];
   let filteredData = [];
   let barChart, donutChart;
-  let sortCol = 'total_revenue';
-  let sortDir = 'desc';
 
   const COLORS = [
     '#6366f1','#8b5cf6','#06b6d4','#3b82f6','#10b981',
@@ -501,7 +501,6 @@
     const values = filteredData.map(r => r.total_revenue);
     const colors = filteredData.map((_, i) => COLORS[i % COLORS.length]);
 
-    // Bar Chart
     if (barChart) barChart.destroy();
     barChart = new Chart(document.getElementById('barChart'), {
       type: 'bar',
@@ -534,18 +533,17 @@
         },
         scales: {
           x: {
-            ticks: { color: '#64748b', font: { size: 11 }, maxRotation: 35 },
+            ticks: { color: '#ffffff', font: { size: 11 }, maxRotation: 35 },
             grid: { color: '#1a2234' }
           },
           y: {
-            ticks: { color: '#64748b', font: { size: 11 }, callback: v => fmtShort(v) },
+            ticks: { color: '#94a3b8', font: { size: 11 }, callback: v => fmtShort(v) },
             grid: { color: '#1a2234' }
           }
         }
       }
     });
 
-    // Donut Chart
     if (donutChart) donutChart.destroy();
     donutChart = new Chart(document.getElementById('donutChart'), {
       type: 'doughnut',
@@ -571,11 +569,16 @@
               boxWidth: 12,
               padding: 10,
               generateLabels: chart => {
-                return chart.data.labels.map((label, i) => ({
-                  text: label.length > 16 ? label.slice(0,16)+'…' : label,
-                  fillStyle: chart.data.datasets[0].backgroundColor[i],
+                const data = chart.data;
+                return data.labels.map((label, i) => ({
+                  text: label.length > 16 ? label.slice(0, 16) + '…' : label,
+                  fillStyle: data.datasets[0].backgroundColor[i],
                   strokeStyle: 'transparent',
-                  index: i
+                  fontColor: '#e2e8f0',
+                  color: '#e2e8f0',
+                  hidden: false,
+                  index: i,
+                  datasetIndex: 0
                 }));
               }
             }
@@ -623,7 +626,7 @@
           <td>
             <div class="revenue-bar-wrap">
               <div class="revenue-bar" style="width:${barW}%;min-width:4px;max-width:120px"></div>
-              <span style="color:#64748b;font-size:0.8rem">${share}%</span>
+              <span style="color:#94a3b8;font-size:0.8rem">${share}%</span>
             </div>
           </td>
         </tr>
@@ -645,5 +648,8 @@
 
   init();
 </script>
+  <footer style="text-align:center;padding:24px 32px;color:#475569;font-size:0.8rem;border-top:1px solid #1e293b;margin-top:8px;">
+    Powered by <a href="https://www.peaka.com" target="_blank" rel="noopener" style="color:#6366f1;text-decoration:none;font-weight:600;">Peaka</a> — Zero-ETL Data Integration Platform
+  </footer>
 </body>
 </html>
