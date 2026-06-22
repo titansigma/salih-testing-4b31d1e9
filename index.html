@@ -519,10 +519,33 @@
     `;
   }
 
-  function applyFilters() {
+  function syncDropdownToState() {
+    const sel = document.getElementById('sortSelect');
+    if (currentSortCol === 'total_revenue') {
+      sel.value = currentSortDir === 'asc' ? 'revenue-asc' : 'revenue-desc';
+    } else if (currentSortCol === 'customer_name') {
+      sel.value = currentSortDir === 'asc' ? 'name-asc' : 'name-desc';
+    }
+  }
+
+  function syncStateToDropdown() {
+    const sort = document.getElementById('sortSelect').value;
+    if (sort === 'revenue-desc') { currentSortCol = 'total_revenue'; currentSortDir = 'desc'; }
+    else if (sort === 'revenue-asc') { currentSortCol = 'total_revenue'; currentSortDir = 'asc'; }
+    else if (sort === 'name-asc') { currentSortCol = 'customer_name'; currentSortDir = 'asc'; }
+    else if (sort === 'name-desc') { currentSortCol = 'customer_name'; currentSortDir = 'desc'; }
+  }
+
+  function applyFilters(source) {
     const search = document.getElementById('searchInput').value.toLowerCase().trim();
     const minRev = parseFloat(document.getElementById('minRevenue').value) || 0;
-    const sort = document.getElementById('sortSelect').value;
+
+    // Keep sort state and dropdown in sync depending on what triggered the filter
+    if (source === 'dropdown') {
+      syncStateToDropdown();
+    } else {
+      syncDropdownToState();
+    }
 
     currentPage = 1;
     filteredData = allData.filter(r => {
@@ -531,16 +554,6 @@
       return true;
     });
 
-    // Dropdown sort
-    filteredData.sort((a, b) => {
-      if (sort === 'revenue-desc') return b.total_revenue - a.total_revenue;
-      if (sort === 'revenue-asc') return a.total_revenue - b.total_revenue;
-      if (sort === 'name-asc') return a.customer_name.localeCompare(b.customer_name);
-      if (sort === 'name-desc') return b.customer_name.localeCompare(a.customer_name);
-      return 0;
-    });
-
-    // Column header sort overrides dropdown
     filteredData.sort((a, b) => {
       let valA = a[currentSortCol];
       let valB = b[currentSortCol];
@@ -784,9 +797,9 @@
   }
 
   function setupEvents() {
-    document.getElementById('searchInput').addEventListener('input', applyFilters);
-    document.getElementById('sortSelect').addEventListener('change', applyFilters);
-    document.getElementById('minRevenue').addEventListener('input', applyFilters);
+    document.getElementById('searchInput').addEventListener('input', () => applyFilters('other'));
+    document.getElementById('sortSelect').addEventListener('change', () => applyFilters('dropdown'));
+    document.getElementById('minRevenue').addEventListener('input', () => applyFilters('other'));
     document.getElementById('resetBtn').addEventListener('click', () => {
       document.getElementById('searchInput').value = '';
       document.getElementById('sortSelect').value = 'revenue-desc';
@@ -794,7 +807,7 @@
       currentSortCol = 'total_revenue';
       currentSortDir = 'desc';
       currentPage = 1;
-      applyFilters();
+      applyFilters('other');
     });
 
     document.querySelectorAll('thead th.sortable').forEach(th => {
@@ -806,11 +819,7 @@
           currentSortCol = col;
           currentSortDir = col === 'total_revenue' ? 'desc' : 'asc';
         }
-        // Sync dropdown to match column sort when on revenue
-        if (col === 'total_revenue') {
-          document.getElementById('sortSelect').value = currentSortDir === 'desc' ? 'revenue-desc' : 'revenue-asc';
-        }
-        applyFilters();
+        applyFilters('column');
       });
     });
   }
