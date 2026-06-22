@@ -317,6 +317,51 @@
       color: #475569;
     }
 
+    /* Pagination */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .pagination-info {
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .page-btn {
+      background: #0f1117;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 6px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      transition: all 0.15s;
+      min-width: 34px;
+      text-align: center;
+    }
+    .page-btn:hover:not(:disabled) { border-color: #6366f1; color: #a5b4fc; }
+    .page-btn.active { background: #6366f1; border-color: #6366f1; color: #fff; font-weight: 700; }
+    .page-btn:disabled { opacity: 0.3; cursor: default; }
+    .page-size-select {
+      background: #0f1117;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      padding: 6px 10px;
+      border-radius: 7px;
+      font-size: 0.82rem;
+      outline: none;
+      cursor: pointer;
+    }
+    .page-size-select:focus { border-color: #6366f1; }
+
     #dashboard { display: none; }
   </style>
 <script>window.__DATA__=[];window.loadData=async function(){try{const r=await fetch('/api/data');if(r.ok){const j=await r.json();if(Array.isArray(j.rows))return j.rows;}}catch(e){}return window.__DATA__;};</script></head>
@@ -407,6 +452,10 @@
   let allData = [];
   let filteredData = [];
   let barChart, donutChart;
+  let currentSortCol = 'total_revenue';
+  let currentSortDir = 'desc';
+  let currentPage = 1;
+  let pageSize = 5;
 
   const COLORS = [
     '#6366f1','#8b5cf6','#06b6d4','#3b82f6','#10b981',
@@ -475,18 +524,33 @@
     const minRev = parseFloat(document.getElementById('minRevenue').value) || 0;
     const sort = document.getElementById('sortSelect').value;
 
+    currentPage = 1;
     filteredData = allData.filter(r => {
       if (search && !r.customer_name.toLowerCase().includes(search)) return false;
       if (r.total_revenue < minRev) return false;
       return true;
     });
 
+    // Dropdown sort
     filteredData.sort((a, b) => {
       if (sort === 'revenue-desc') return b.total_revenue - a.total_revenue;
       if (sort === 'revenue-asc') return a.total_revenue - b.total_revenue;
       if (sort === 'name-asc') return a.customer_name.localeCompare(b.customer_name);
       if (sort === 'name-desc') return b.customer_name.localeCompare(a.customer_name);
       return 0;
+    });
+
+    // Column header sort overrides dropdown
+    filteredData.sort((a, b) => {
+      let valA = a[currentSortCol];
+      let valB = b[currentSortCol];
+      if (currentSortCol === 'total_revenue' || currentSortCol === 'customer_id') {
+        valA = parseFloat(valA); valB = parseFloat(valB);
+        return currentSortDir === 'asc' ? valA - valB : valB - valA;
+      }
+      return currentSortDir === 'asc'
+        ? String(valA).localeCompare(String(valB))
+        : String(valB).localeCompare(String(valA));
     });
 
     renderKPIs(filteredData.length ? filteredData : allData);
@@ -608,18 +672,38 @@
     const tbody = document.getElementById('tableBody');
     document.getElementById('rowCount').textContent = `${filteredData.length} customer${filteredData.length !== 1 ? 's' : ''}`;
 
+    // Update sort indicators
+    document.querySelectorAll('thead th.sortable').forEach(th => {
+      th.classList.remove('active');
+      const icon = th.querySelector('.sort-icon');
+      if (th.dataset.col === currentSortCol) {
+        th.classList.add('active');
+        icon.textContent = currentSortDir === 'asc' ? '↑' : '↓';
+      } else {
+        icon.textContent = '↕';
+      }
+    });
+
     if (!filteredData.length) {
       tbody.innerHTML = `<tr><td colspan="5" class="no-data">No customers match your filters.</td></tr>`;
+      renderPagination(0);
       return;
     }
 
-    tbody.innerHTML = filteredData.map((r, i) => {
+    const totalPages = Math.ceil(filteredData.length / pageSize);
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const start = (currentPage - 1) * pageSize;
+    const pageData = filteredData.slice(start, start + pageSize);
+
+    tbody.innerHTML = pageData.map((r, i) => {
+      const globalIndex = start + i;
       const share = grandTotal ? ((r.total_revenue / grandTotal) * 100).toFixed(1) : 0;
       const barW = maxRev ? (r.total_revenue / maxRev * 100).toFixed(1) : 0;
-      const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank-other';
+      const rankClass = globalIndex === 0 ? 'rank-1' : globalIndex === 1 ? 'rank-2' : globalIndex === 2 ? 'rank-3' : 'rank-other';
       return `
         <tr>
-          <td><span class="rank-badge ${rankClass}">${i+1}</span></td>
+          <td><span class="rank-badge ${rankClass}">${globalIndex+1}</span></td>
           <td style="font-weight:600;color:#f1f5f9">${r.customer_name}</td>
           <td style="color:#64748b;font-size:0.82rem">${r.customer_id}</td>
           <td style="font-weight:700;color:#a5b4fc">${fmt(r.total_revenue)}</td>
@@ -632,6 +716,71 @@
         </tr>
       `;
     }).join('');
+
+    renderPagination(totalPages);
+  }
+
+  function renderPagination(totalPages) {
+    let el = document.getElementById('paginationBar');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'paginationBar';
+      document.querySelector('.table-card').appendChild(el);
+    }
+
+    if (totalPages <= 1 && filteredData.length === 0) {
+      el.innerHTML = '';
+      return;
+    }
+
+    const start = (currentPage - 1) * pageSize + 1;
+    const end = Math.min(currentPage * pageSize, filteredData.length);
+
+    // Build page number buttons (show up to 5 around current)
+    let pageBtns = '';
+    const delta = 2;
+    const left = Math.max(1, currentPage - delta);
+    const right = Math.min(totalPages, currentPage + delta);
+
+    if (left > 1) pageBtns += `<button class="page-btn" data-page="1">1</button>`;
+    if (left > 2) pageBtns += `<span style="color:#475569;padding:0 2px">…</span>`;
+    for (let p = left; p <= right; p++) {
+      pageBtns += `<button class="page-btn ${p === currentPage ? 'active' : ''}" data-page="${p}">${p}</button>`;
+    }
+    if (right < totalPages - 1) pageBtns += `<span style="color:#475569;padding:0 2px">…</span>`;
+    if (right < totalPages) pageBtns += `<button class="page-btn" data-page="${totalPages}">${totalPages}</button>`;
+
+    el.innerHTML = `
+      <div class="pagination">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="pagination-info">Showing ${start}–${end} of ${filteredData.length}</span>
+          <select class="page-size-select" id="pageSizeSelect">
+            <option value="5" ${pageSize===5?'selected':''}>5 / page</option>
+            <option value="10" ${pageSize===10?'selected':''}>10 / page</option>
+            <option value="20" ${pageSize===20?'selected':''}>20 / page</option>
+          </select>
+        </div>
+        <div class="pagination-controls">
+          <button class="page-btn" id="prevBtn" ${currentPage===1?'disabled':''}>‹ Prev</button>
+          ${pageBtns}
+          <button class="page-btn" id="nextBtn" ${currentPage===totalPages?'disabled':''}>Next ›</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('prevBtn').addEventListener('click', () => { currentPage--; renderTable(); });
+    document.getElementById('nextBtn').addEventListener('click', () => { currentPage++; renderTable(); });
+    document.getElementById('pageSizeSelect').addEventListener('change', e => {
+      pageSize = parseInt(e.target.value);
+      currentPage = 1;
+      renderTable();
+    });
+    el.querySelectorAll('.page-btn[data-page]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentPage = parseInt(btn.dataset.page);
+        renderTable();
+      });
+    });
   }
 
   function setupEvents() {
@@ -642,7 +791,27 @@
       document.getElementById('searchInput').value = '';
       document.getElementById('sortSelect').value = 'revenue-desc';
       document.getElementById('minRevenue').value = '';
+      currentSortCol = 'total_revenue';
+      currentSortDir = 'desc';
+      currentPage = 1;
       applyFilters();
+    });
+
+    document.querySelectorAll('thead th.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        if (currentSortCol === col) {
+          currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          currentSortCol = col;
+          currentSortDir = col === 'total_revenue' ? 'desc' : 'asc';
+        }
+        // Sync dropdown to match column sort when on revenue
+        if (col === 'total_revenue') {
+          document.getElementById('sortSelect').value = currentSortDir === 'desc' ? 'revenue-desc' : 'revenue-asc';
+        }
+        applyFilters();
+      });
     });
   }
 
