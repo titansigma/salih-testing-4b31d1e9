@@ -1,5 +1,16 @@
 const DATA = {
-  "report-1": `SELECT id, name, type, balance, active, donotmail, donotservice, createdon, modifiedon FROM copy_connection.crm.customers ORDER BY balance DESC LIMIT 20`
+  "report-1": `SELECT id, name, type, balance, active, donotmail, donotservice, createdon, modifiedon FROM copy_connection.crm.customers ORDER BY balance DESC LIMIT 20`,
+  "technician-revenue": `SELECT 
+  json_extract_scalar(employeeinfo, '$.id') AS technician_id,
+  json_extract_scalar(employeeinfo, '$.name') AS technician_name,
+  SUM(TRY_CAST(total AS decimal(15,3))) AS total_revenue
+FROM copy_connection.accounting.invoices
+WHERE active = true
+  AND employeeinfo IS NOT NULL
+  AND json_extract_scalar(employeeinfo, '$.name') IS NOT NULL
+GROUP BY 1, 2
+ORDER BY total_revenue DESC
+LIMIT 10`
 };
 
 module.exports = async function handler(req, res) {

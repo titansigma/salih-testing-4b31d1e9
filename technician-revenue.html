@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Top 10 Technicians by Revenue</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border-bottom: 1px solid #1e293b;
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    header h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      letter-spacing: -0.3px;
+    }
+
+    header span {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-left: 10px;
+      font-weight: 400;
+    }
+
+    .badge {
+      background: #6366f1;
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    main {
+      padding: 28px 32px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Loading */
+    #loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 60vh;
+      gap: 16px;
+      color: #64748b;
+    }
+
+    .spinner {
+      width: 42px;
+      height: 42px;
+      border: 3px solid #1e293b;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #dashboard { display: none; }
+
+    /* Stat Cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 20px 22px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .stat-card:hover { transform: translateY(-2px); border-color: #6366f1; }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: 14px 14px 0 0;
+    }
+
+    .stat-card.purple::before { background: linear-gradient(90deg, #6366f1, #8b5cf6); }
+    .stat-card.teal::before   { background: linear-gradient(90deg, #0ea5e9, #06b6d4); }
+    .stat-card.green::before  { background: linear-gradient(90deg, #22c55e, #16a34a); }
+    .stat-card.orange::before { background: linear-gradient(90deg, #f59e0b, #f97316); }
+
+    .stat-label { font-size: 0.73rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+    .stat-value { font-size: 1.7rem; font-weight: 700; color: #f1f5f9; line-height: 1; }
+    .stat-sub   { font-size: 0.78rem; color: #64748b; margin-top: 6px; }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .search-wrap {
+      position: relative;
+      flex: 1;
+      min-width: 200px;
+      max-width: 320px;
+    }
+
+    .search-wrap svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #64748b;
+    }
+
+    input[type="text"], select {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 9px 14px 9px 38px;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+
+    select { padding-left: 14px; cursor: pointer; min-width: 180px; width: auto; }
+
+    input[type="text"]:focus, select:focus { border-color: #6366f1; }
+
+    .filter-label {
+      font-size: 0.8rem;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    /* Charts Row */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .charts-row { grid-template-columns: 1fr; }
+    }
+
+    .chart-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 22px 24px;
+    }
+
+    .chart-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chart-title-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #6366f1;
+      display: inline-block;
+    }
+
+    .chart-wrap {
+      position: relative;
+      width: 100%;
+    }
+
+    /* Table */
+    .table-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+
+    .table-header {
+      padding: 18px 24px 14px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .table-header-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .row-count {
+      font-size: 0.75rem;
+      color: #64748b;
+      background: #0f1117;
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid #334155;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    thead th {
+      background: #0f172a;
+      color: #94a3b8;
+      font-weight: 600;
+      font-size: 0.73rem;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      padding: 12px 20px;
+      text-align: left;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    thead th:hover { color: #e2e8f0; }
+
+    thead th .sort-icon { margin-left: 5px; color: #475569; }
+    thead th.active .sort-icon { color: #6366f1; }
+
+    tbody tr {
+      border-bottom: 1px solid #1a2535;
+      transition: background 0.15s;
+      cursor: pointer;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #0f172a; }
+
+    td { padding: 13px 20px; color: #cbd5e1; }
+
+    td.rank { color: #64748b; font-weight: 700; font-size: 0.8rem; }
+
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px; height: 26px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .rank-1 { background: #fef3c7; color: #92400e; }
+    .rank-2 { background: #e2e8f0; color: #475569; }
+    .rank-3 { background: #fed7aa; color: #9a3412; }
+    .rank-other { background: #1e293b; color: #64748b; border: 1px solid #334155; }
+
+    td.name { font-weight: 600; color: #f1f5f9; }
+
+    .tech-name-clean {
+      font-size: 0.82rem;
+      color: #64748b;
+      font-weight: 400;
+    }
+
+    td.revenue { font-weight: 700; color: #6ee7b7; font-variant-numeric: tabular-nums; }
+
+    .rev-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .rev-bar {
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, #6366f1, #8b5cf6);
+      min-width: 4px;
+      transition: width 0.4s ease;
+    }
+
+    .rev-bar-bg {
+      flex: 1;
+      height: 6px;
+      background: #0f172a;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    td.share { color: #94a3b8; font-size: 0.83rem; }
+
+    /* No results */
+    .no-results {
+      text-align: center;
+      padding: 40px;
+      color: #475569;
+      font-size: 0.9rem;
+    }
+
+    /* Highlight */
+    .highlight { color: #818cf8; }
+  </style>
+<script>window.__DATA__=[];window.loadData=async function(){try{const r=await fetch("/api/data?report=technician-revenue");if(r.ok){const j=await r.json();if(Array.isArray(j.rows))return j.rows;}}catch(e){}return window.__DATA__;};</script></head>
+<body><nav style="position:sticky;top:0;z-index:2147483647;display:flex;align-items:center;gap:12px;padding:8px 14px;background:#0b0f19;color:#e5e7eb;font:500 13px/1.2 system-ui,sans-serif;border-bottom:1px solid #1f2937;">
+  <a href="/" style="color:#a5b4fc;text-decoration:none;font-weight:600;">⌂ All reports</a>
+  <select onchange="if(this.value)location.href=this.value" style="margin-left:auto;background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:6px;padding:4px 8px;font:inherit;"><option value="/report-1">Report 1</option><option value="/technician-revenue" selected>Technician Revenue</option></select>
+</nav>
+
+<header>
+  <div>
+    <h1>🔧 Technician Revenue Dashboard <span>Top 10 by Total Revenue</span></h1>
+  </div>
+  <span class="badge">LIVE DATA</span>
+</header>
+
+<main>
+  <div id="loading">
+    <div class="spinner"></div>
+    <div>Loading technician data…</div>
+  </div>
+
+  <div id="dashboard">
+    <!-- Stat Cards -->
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div class="search-wrap">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input type="text" id="searchInput" placeholder="Search technician…" />
+      </div>
+      <span class="filter-label">Sort by:</span>
+      <select id="sortSelect">
+        <option value="revenue-desc">Revenue: High → Low</option>
+        <option value="revenue-asc">Revenue: Low → High</option>
+        <option value="name-asc">Name: A → Z</option>
+        <option value="name-desc">Name: Z → A</option>
+      </select>
+      <span class="filter-label">Min Revenue:</span>
+      <select id="minRevSelect">
+        <option value="0">All</option>
+        <option value="500000">$500K+</option>
+        <option value="1000000">$1M+</option>
+        <option value="2000000">$2M+</option>
+        <option value="5000000">$5M+</option>
+      </select>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title"><span class="chart-title-dot"></span> Revenue by Technician</div>
+        <div class="chart-wrap" style="height:300px">
+          <canvas id="barChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title"><span class="chart-title-dot" style="background:#06b6d4"></span> Revenue Share</div>
+        <div class="chart-wrap" style="height:300px">
+          <canvas id="donutChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-header-title">
+          <span class="chart-title-dot" style="background:#22c55e"></span>
+          Technician Breakdown
+        </div>
+        <span class="row-count" id="rowCount"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:60px">#</th>
+              <th id="th-name" class="active" onclick="handleThSort('name')">Technician <span class="sort-icon">↕</span></th>
+              <th id="th-id">ID</th>
+              <th id="th-revenue" onclick="handleThSort('revenue')">Revenue <span class="sort-icon">↕</span></th>
+              <th>Share of Total</th>
+              <th>Revenue Bar</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+        <div class="no-results" id="noResults" style="display:none">No technicians match your filters.</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  let allData = [];
+  let filteredData = [];
+  let totalRevenue = 0;
+  let maxRevenue = 0;
+  let barChart, donutChart;
+  let tableSortField = 'revenue';
+  let tableSortDir = 'desc';
+
+  const COLORS = [
+    '#6366f1','#8b5cf6','#06b6d4','#0ea5e9','#22c55e',
+    '#f59e0b','#f97316','#ef4444','#ec4899','#a78bfa'
+  ];
+
+  function fmt(v) {
+    if (v >= 1e6) return '$' + (v/1e6).toFixed(2) + 'M';
+    if (v >= 1e3) return '$' + (v/1e3).toFixed(1) + 'K';
+    return '$' + v.toFixed(0);
+  }
+
+  function fmtFull(v) {
+    return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function cleanName(raw) {
+    // e.g. "Jackie.Anicas.TK" → "Jackie Anicas"
+    return raw.replace(/\.(TK|tk|Tk)$/i, '').replace(/\./g, ' ');
+  }
+
+  function renderStats(data) {
+    const total = data.reduce((s,r) => s + r._rev, 0);
+    const avg = total / (data.length || 1);
+    const top = data.reduce((a,b) => a._rev > b._rev ? a : b, data[0]);
+    const statsGrid = document.getElementById('statsGrid');
+    statsGrid.innerHTML = `
+      <div class="stat-card purple">
+        <div class="stat-label">Total Revenue</div>
+        <div class="stat-value">${fmt(total)}</div>
+        <div class="stat-sub">Across ${data.length} technicians</div>
+      </div>
+      <div class="stat-card teal">
+        <div class="stat-label">Avg Revenue / Tech</div>
+        <div class="stat-value">${fmt(avg)}</div>
+        <div class="stat-sub">Mean across filtered set</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">Top Technician</div>
+        <div class="stat-value" style="font-size:1.1rem; margin-top:4px">${cleanName(top?.technician_name || '—')}</div>
+        <div class="stat-sub">${fmt(top?._rev || 0)} revenue</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-label">Technicians Shown</div>
+        <div class="stat-value">${data.length}</div>
+        <div class="stat-sub">of ${allData.length} total</div>
+      </div>
+    `;
+  }
+
+  function renderCharts(data) {
+    const labels = data.map(r => cleanName(r.technician_name));
+    const values = data.map(r => r._rev);
+
+    // Bar Chart
+    if (barChart) barChart.destroy();
+    barChart = new Chart(document.getElementById('barChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Revenue',
+          data: values,
+          backgroundColor: COLORS.slice(0, data.length).map(c => c + 'cc'),
+          borderColor: COLORS.slice(0, data.length),
+          borderWidth: 2,
+          borderRadius: 6,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => ' ' + fmtFull(ctx.parsed.y)
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#94a3b8', font: { size: 11 }, maxRotation: 30 },
+            grid: { color: '#1e293b' }
+          },
+          y: {
+            ticks: {
+              color: '#94a3b8',
+              font: { size: 11 },
+              callback: v => fmt(v)
+            },
+            grid: { color: '#1e293b' }
+          }
+        }
+      }
+    });
+
+    // Donut Chart
+    if (donutChart) donutChart.destroy();
+    donutChart = new Chart(document.getElementById('donutChart'), {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          backgroundColor: COLORS.slice(0, data.length).map(c => c + 'dd'),
+          borderColor: '#0f1117',
+          borderWidth: 3,
+          hoverOffset: 8,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '62%',
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: {
+              color: '#94a3b8',
+              font: { size: 11 },
+              boxWidth: 12,
+              padding: 10,
+              generateLabels: chart => {
+                const ds = chart.data.datasets[0];
+                const total = ds.data.reduce((a,b) => a+b, 0);
+                return chart.data.labels.map((label, i) => ({
+                  text: `${label} (${((ds.data[i]/total)*100).toFixed(1)}%)`,
+                  fillStyle: ds.backgroundColor[i],
+                  strokeStyle: ds.borderColor,
+                  lineWidth: 1,
+                  index: i,
+                  hidden: false,
+                }));
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const total = ctx.dataset.data.reduce((a,b)=>a+b,0);
+                const pct = ((ctx.parsed/total)*100).toFixed(1);
+                return ` ${fmtFull(ctx.parsed)} (${pct}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  function renderTable(data) {
+    const tbody = document.getElementById('tableBody');
+    const noResults = document.getElementById('noResults');
+    const rowCount = document.getElementById('rowCount');
+    rowCount.textContent = `${data.length} technician${data.length !== 1 ? 's' : ''}`;
+
+    if (!data.length) {
+      tbody.innerHTML = '';
+      noResults.style.display = 'block';
+      return;
+    }
+    noResults.style.display = 'none';
+
+    const allTotal = allData.reduce((s,r) => s+r._rev, 0);
+    const localMax = data[0]?._rev || 1;
+
+    tbody.innerHTML = data.map((r, i) => {
+      const rank = i + 1;
+      const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+      const pct = ((r._rev / allTotal) * 100).toFixed(1);
+      const barPct = ((r._rev / localMax) * 100).toFixed(1);
+      const cn = cleanName(r.technician_name);
+
+      return `<tr>
+        <td class="rank"><span class="rank-badge ${rankClass}">${rank}</span></td>
+        <td class="name">
+          ${cn}
+          <br><span class="tech-name-clean">${r.technician_name}</span>
+        </td>
+        <td style="color:#64748b; font-size:0.8rem; font-family:monospace">${r.technician_id}</td>
+        <td class="revenue">${fmtFull(r._rev)}</td>
+        <td class="share">${pct}%</td>
+        <td style="min-width:120px">
+          <div class="rev-bar-bg">
+            <div class="rev-bar" style="width:${barPct}%"></div>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  function applyFilters() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const minRev = parseFloat(document.getElementById('minRevSelect').value);
+    const sort = document.getElementById('sortSelect').value;
+
+    let data = allData.filter(r => {
+      const cn = cleanName(r.technician_name).toLowerCase();
+      const raw = r.technician_name.toLowerCase();
+      return (cn.includes(search) || raw.includes(search) || r.technician_id.includes(search))
+        && r._rev >= minRev;
+    });
+
+    if (sort === 'revenue-desc') data.sort((a,b) => b._rev - a._rev);
+    else if (sort === 'revenue-asc') data.sort((a,b) => a._rev - b._rev);
+    else if (sort === 'name-asc') data.sort((a,b) => a.technician_name.localeCompare(b.technician_name));
+    else if (sort === 'name-desc') data.sort((a,b) => b.technician_name.localeCompare(a.technician_name));
+
+    filteredData = data;
+    renderStats(filteredData);
+    renderCharts(filteredData);
+    renderTable(filteredData);
+  }
+
+  function handleThSort(field) {
+    if (tableSortField === field) {
+      tableSortDir = tableSortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      tableSortField = field;
+      tableSortDir = field === 'revenue' ? 'desc' : 'asc';
+    }
+    const sortVal = field === 'revenue'
+      ? (tableSortDir === 'desc' ? 'revenue-desc' : 'revenue-asc')
+      : (tableSortDir === 'asc' ? 'name-asc' : 'name-desc');
+    document.getElementById('sortSelect').value = sortVal;
+    applyFilters();
+  }
+
+  // Bind controls
+  document.getElementById('searchInput').addEventListener('input', applyFilters);
+  document.getElementById('sortSelect').addEventListener('change', applyFilters);
+  document.getElementById('minRevSelect').addEventListener('change', applyFilters);
+
+  // Init
+  (async () => {
+    try {
+      const rows = await loadData();
+      allData = rows.map(r => ({
+        ...r,
+        _rev: parseFloat(r.total_revenue) || 0
+      })).filter(r => r.technician_name && r.technician_name.trim());
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+
+      applyFilters();
+    } catch(e) {
+      document.getElementById('loading').innerHTML =
+        `<div style="color:#ef4444">⚠️ Failed to load data: ${e.message}</div>`;
+    }
+  })();
+</script>
+</body>
+</html>

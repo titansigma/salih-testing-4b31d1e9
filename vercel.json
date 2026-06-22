@@ -24,7 +24,7 @@
       "dest": "/index.html"
     },
     {
-      "src": "/(report-1)",
+      "src": "/(report-1|technician-revenue)",
       "dest": "/$1.html"
     },
     {
