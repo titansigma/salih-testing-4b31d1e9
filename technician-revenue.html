@@ -326,6 +326,45 @@
 
     td.share { color: #94a3b8; font-size: 0.83rem; }
 
+    /* Pagination */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-top: 1px solid #334155;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pagination-info {
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+
+    .pagination-controls {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .page-btn {
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      min-width: 34px;
+      text-align: center;
+    }
+
+    .page-btn:hover:not(:disabled) { border-color: #6366f1; color: #e2e8f0; }
+    .page-btn.active { background: #6366f1; border-color: #6366f1; color: #fff; font-weight: 700; }
+    .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
     /* No results */
     .no-results {
       text-align: center;
@@ -426,6 +465,7 @@
         </table>
         <div class="no-results" id="noResults" style="display:none">No technicians match your filters.</div>
       </div>
+      <div id="paginationContainer"></div>
     </div>
   </div>
 </main>
@@ -438,6 +478,8 @@
   let barChart, donutChart;
   let tableSortField = 'revenue';
   let tableSortDir = 'desc';
+  let currentPage = 1;
+  const PAGE_SIZE = 10;
 
   const COLORS = [
     '#6366f1','#8b5cf6','#06b6d4','#0ea5e9','#22c55e',
@@ -599,18 +641,25 @@
     if (!data.length) {
       tbody.innerHTML = '';
       noResults.style.display = 'block';
+      renderPagination(0, 0);
       return;
     }
     noResults.style.display = 'none';
 
-    const allTotal = allData.reduce((s,r) => s+r._rev, 0);
-    const localMax = data[0]?._rev || 1;
+    const totalPages = Math.ceil(data.length / PAGE_SIZE);
+    if (currentPage > totalPages) currentPage = totalPages;
 
-    tbody.innerHTML = data.map((r, i) => {
-      const rank = i + 1;
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageData = data.slice(start, start + PAGE_SIZE);
+
+    const allTotal = allData.reduce((s,r) => s+r._rev, 0);
+    const globalMax = allData[0]?._rev || 1;
+
+    tbody.innerHTML = pageData.map((r, i) => {
+      const rank = start + i + 1;
       const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
       const pct = ((r._rev / allTotal) * 100).toFixed(1);
-      const barPct = ((r._rev / localMax) * 100).toFixed(1);
+      const barPct = ((r._rev / globalMax) * 100).toFixed(1);
       const cn = cleanName(r.technician_name);
 
       return `<tr>
@@ -629,6 +678,47 @@
         </td>
       </tr>`;
     }).join('');
+
+    renderPagination(data.length, totalPages);
+  }
+
+  function renderPagination(total, totalPages) {
+    const container = document.getElementById('paginationContainer');
+    if (total === 0) { container.innerHTML = ''; return; }
+
+    const start = (currentPage - 1) * PAGE_SIZE + 1;
+    const end = Math.min(currentPage * PAGE_SIZE, total);
+
+    let pageButtons = '';
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+    if (endPage - startPage < maxVisible - 1) startPage = Math.max(1, endPage - maxVisible + 1);
+
+    if (startPage > 1) pageButtons += `<button class="page-btn" onclick="goToPage(1)">1</button>`;
+    if (startPage > 2) pageButtons += `<span style="color:#475569;padding:0 4px">…</span>`;
+
+    for (let p = startPage; p <= endPage; p++) {
+      pageButtons += `<button class="page-btn ${p === currentPage ? 'active' : ''}" onclick="goToPage(${p})">${p}</button>`;
+    }
+
+    if (endPage < totalPages - 1) pageButtons += `<span style="color:#475569;padding:0 4px">…</span>`;
+    if (endPage < totalPages) pageButtons += `<button class="page-btn" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+
+    container.innerHTML = `
+      <div class="pagination">
+        <span class="pagination-info">Showing ${start}–${end} of ${total} technicians</span>
+        <div class="pagination-controls">
+          <button class="page-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>‹ Prev</button>
+          ${pageButtons}
+          <button class="page-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next ›</button>
+        </div>
+      </div>`;
+  }
+
+  function goToPage(page) {
+    currentPage = page;
+    renderTable(filteredData);
   }
 
   function applyFilters() {
@@ -648,6 +738,7 @@
     else if (sort === 'name-asc') data.sort((a,b) => a.technician_name.localeCompare(b.technician_name));
     else if (sort === 'name-desc') data.sort((a,b) => b.technician_name.localeCompare(a.technician_name));
 
+    currentPage = 1;
     filteredData = data;
     renderStats(filteredData);
     renderCharts(filteredData);
