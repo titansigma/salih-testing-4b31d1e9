@@ -10,7 +10,7 @@ WHERE active = true
   AND json_extract_scalar(employeeinfo, '$.name') IS NOT NULL
 GROUP BY 1, 2
 ORDER BY total_revenue DESC
-LIMIT 10`
+LIMIT 20`
 };
 
 module.exports = async function handler(req, res) {
